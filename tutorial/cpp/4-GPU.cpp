@@ -17,7 +17,7 @@
 
 int main() {
     int d = 64;                            // dimension
-    int nb = 100000;                       // database size
+    int nb = 20 * 1000 * 1000;                       // database size
     int nq = 10000;                        // nb of queries
 
     float *xb = new float[d * nb];

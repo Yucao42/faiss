@@ -15,7 +15,7 @@ clean:
 	rm -f $(DEMOS)
 
 %: %.cpp
-	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(CPUFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) -lfaiss
+	$(CXX) $(CPPFLAGS) $(CXXFLAGS) $(CPUFLAGS) -o $@ $^ $(LDFLAGS) $(LIBS) -lfaiss -I$(HOME)/Documents -L$(HOME)/Documents/faiss
 
 
 .PHONY: all clean
