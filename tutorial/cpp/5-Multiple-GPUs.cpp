@@ -15,7 +15,7 @@
 
 #define CPU_KNN_TEST 0     
 #define GPU_KNN_TEST 0
-#define CPU_ANN_TEST 1     
+#define CPU_ANN_TEST 0     
 #define GPU_ANN_TEST 1
 #include <cstdio>
 #include <cstdlib>
@@ -40,6 +40,8 @@ int main() {
     printf("Size of long: %d\n", sizeof(long));
     long nb = 200 * 1000* 1000;                       // database size
     int nq = 1000;                        // nb of queries
+    int nlist =  100000;
+    int m = 8;                             // bytes per vector
 
     float *xb = new float[d * nb];
     float *xq = new float[d * nq];
@@ -199,9 +201,6 @@ int main() {
     }
 #endif
 
-
-int nlist =  1000;
-int m = 8;                             // bytes per vector
 
 #if CPU_ANN_TEST > 0
     {

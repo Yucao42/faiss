@@ -9,6 +9,7 @@ from __future__ import print_function
 import os
 import time
 import numpy as np
+from IPython import embed
 
 try:
     import matplotlib
@@ -74,13 +75,13 @@ k = gt.shape[1]
 print("prepare criterion")
 
 # criterion = 1-recall at 1
-crit = faiss.OneRecallAtRCriterion(xq.shape[0], 1)
+crit = faiss.OneRecallAtRCriterion(xq.shape[0], 100)
 crit.set_groundtruth(None, gt)
 crit.nnn = k
 
 # indexes that are useful when there is no limitation on memory usage
 unlimited_mem_keys = [
-    "IMI2x10,Flat", "IMI2x11,Flat",
+    "IMI2x10","Flat", "IMI2x11,Flat",
     "IVF4096,Flat", "IVF16384,Flat",
     "PCA64,IMI2x10,Flat"]
 
@@ -106,7 +107,7 @@ keys_gpu = [
 
 keys_to_test = unlimited_mem_keys
 keys_to_test = keys_gpu
-# keys_to_test = ["Flat", "IVF4096,Flat"]
+keys_to_test = ["PQ32", "IVF4096,Flat", "IVF2048,PQ32", "IVF4096,PQ32"]
 use_gpu = True
 # use_gpu = False
 
@@ -186,6 +187,7 @@ for use_gpu in range(2):
         pyplot.gca().set_yscale('log')
         pyplot.grid()
         for i2, opi2 in op_per_key:
+            # embed()
             plot_OperatingPoints(opi2, crit.nq, label = i2, marker = 'o')
         # plot_OperatingPoints(op, crit.nq, label = 'best', marker = 'o', color = 'r')
         pyplot.legend(loc=2)
@@ -193,6 +195,10 @@ for use_gpu in range(2):
 
 
 # Draw time distribution
+print("training time cpu: \n", training_time_cpu, '\n')
+print("training time gpu: \n", training_time_gpu, '\n')
+print("indexing time cpu: \n", indexing_time_cpu, '\n')
+print("indexing time cpu: \n", indexing_time_gpu, '\n')
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -205,6 +211,7 @@ gpu_time = [v for k, v in training_time_gpu.items()]
 fig, ax = plt.subplots()
 index = np.arange(n_groups)
 bar_width = 0.35
+half_bar_width = bar_width / 2
 opacity = 0.8
 
 rects1 = plt.bar(index, cpu_time, bar_width,
@@ -220,7 +227,7 @@ rects2 = plt.bar(index + bar_width, gpu_time, bar_width,
 plt.xlabel('Method')
 plt.ylabel('Time(s)')
 plt.title('Training Time on 100K 128-d SIFT Features')
-plt.xticks(index + bar_width, [k for k, v in training_time_cpu.items()])
+plt.xticks(index + half_bar_width, [k.replace(',Flat', '') for k, v in training_time_cpu.items()])
 plt.legend()
 
 # pyplot.gca().set_yscale('log')
@@ -253,7 +260,7 @@ rects2 = plt.bar(index + bar_width, gpu_time, bar_width,
 plt.xlabel('Method')
 plt.ylabel('Time(s)')
 plt.title('Indexing Time on 1M 128-d SIFT Features')
-plt.xticks(index + bar_width, [k for k, v in training_time_cpu.items()])
+plt.xticks(index + half_bar_width, [k.replace(',Flat', '') for k, v in training_time_cpu.items()])
 plt.legend()
 
 # pyplot.gca().set_yscale('log')

@@ -159,6 +159,8 @@ int main()
         int *gt_int = ivecs_read("sift1M/sift_groundtruth.ivecs", &k, &nq2);
         assert(nq2 == nq || !"incorrect nb of ground truth entries");
 
+        printf ("[%.3f s] What is k %d queries\n",
+                elapsed() - t0, k);
         gt = new faiss::Index::idx_t[k * nq];
         for(int i = 0; i < k * nq; i++) {
             gt[i] = gt_int[i];
@@ -216,6 +218,9 @@ int main()
 
         params.set_index_parameters (index, selected_params.c_str());
 
+        // std::string config("nprobe=16");
+        // params.set_index_parameters (index, config.c_str());
+
         printf ("[%.3f s] Perform a search on %ld queries\n",
                 elapsed() - t0, nq);
 
@@ -243,6 +248,20 @@ int main()
         printf("R@10 = %.4f\n", n_10 / float(nq));
         printf("R@100 = %.4f\n", n_100 / float(nq));
 
+        
+        FILE* fp = fopen("results.txt", "w");
+        // Write gt
+        for(int i = 0; i < nq; i++) {
+            int gt_nn = gt[i * k];
+            fprintf(fp, "%d,", gt_nn);
+        }
+        fprintf(fp, "\n");
+        for(int i = 0; i < nq; i++) {
+            int dt_nn = I[i * k];
+            fprintf(fp, "%d,", dt_nn);
+        }
+        fprintf(fp, "\n");
+        fclose(fp);
     }
 
     delete [] xq;
