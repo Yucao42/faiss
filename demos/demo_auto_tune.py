@@ -41,6 +41,8 @@ def fvecs_read(fname):
 def plot_OperatingPoints(ops, nq, **kwargs):
     ops = ops.optimal_pts
     n = ops.size() * 2 - 1
+    print([ops.at( i      // 2).perf for i in range(n)],
+                [ops.at((i + 1) // 2).t / nq * 1000 for i in range(n)])
     pyplot.plot([ops.at( i      // 2).perf for i in range(n)],
                 [ops.at((i + 1) // 2).t / nq * 1000 for i in range(n)],
                 **kwargs)
@@ -59,6 +61,7 @@ print("load data")
 xt = fvecs_read("sift1M/sift_learn.fvecs")
 xb = fvecs_read("sift1M/sift_base.fvecs")
 xq = fvecs_read("sift1M/sift_query.fvecs")
+print(xq[0])
 
 d = xt.shape[1]
 
@@ -103,7 +106,9 @@ keys_gpu = [
 
 keys_to_test = unlimited_mem_keys
 keys_to_test = keys_gpu
+# keys_to_test = ["Flat", "IVF4096,Flat"]
 use_gpu = True
+# use_gpu = False
 
 
 if use_gpu:
@@ -111,7 +116,7 @@ if use_gpu:
     assert faiss.StandardGpuResources, \
         "FAISS was not compiled with GPU support, or loading _swigfaiss_gpu.so failed"
     res = faiss.StandardGpuResources()
-    dev_no = 0
+    dev_no = 1
 
 # remember results from other index types
 op_per_key = []
@@ -120,57 +125,139 @@ op_per_key = []
 # keep track of optimal operating points seen so far
 op = faiss.OperatingPoints()
 
+training_time_cpu = {}
+indexing_time_cpu = {}
+training_time_gpu = {}
+indexing_time_gpu = {}
 
-for index_key in keys_to_test:
+for use_gpu in range(2):
+    for index_key in keys_to_test:
+    
+        print("============ key", index_key)
+    
+        # make the index described by the key
+        index = faiss.index_factory(d, index_key)
+    
+    
+        if use_gpu:
+            # transfer to GPU (may be partial)
+            index = faiss.index_cpu_to_gpu(res, dev_no, index)
+            params = faiss.GpuParameterSpace()
+        else:
+            params = faiss.ParameterSpace()
+    
+        params.initialize(index)
+    
+        print("[%.3f s] train & add" % (time.time() - t0))
+    
+        t1 = time.time()
+        index.train(xt)
+        if use_gpu:
+            training_time_gpu[index_key] = time.time() - t1
+        else:
+            training_time_cpu[index_key] = time.time() - t1
+        t1 = time.time()
+        index.add(xb)
+        if use_gpu:
+            indexing_time_gpu[index_key] = time.time() - t1
+        else:
+            indexing_time_cpu[index_key] = time.time() - t1
+    
+        print("[%.3f s] explore op points" % (time.time() - t0))
+    
+        # find operating points for this index
+        opi = params.explore(index, xq, crit)
+    
+        print("[%.3f s] result operating points:" % (time.time() - t0))
+        opi.display()
+    
+        # update best operating points so far
+        op.merge_with(opi, index_key + " ")
+    
+        op_per_key.append((index_key, opi))
+    
+        # if graphical_output:
+        #     # graphical output (to tmp/ subdirectory)
+    
+        #     fig = pyplot.figure(figsize=(12, 9))
+        #     pyplot.xlabel("1-recall at 1")
+        #     pyplot.ylabel("search time (ms/query, %d threads)" % faiss.omp_get_max_threads())
+        #     pyplot.gca().set_yscale('log')
+        #     pyplot.grid()
+        #     for i2, opi2 in op_per_key:
+        #         plot_OperatingPoints(opi2, crit.nq, label = i2, marker = 'o')
+        #     # plot_OperatingPoints(op, crit.nq, label = 'best', marker = 'o', color = 'r')
+        #     pyplot.legend(loc=2)
+        #     fig.savefig(f'tmp/demo_auto_tune_gpu{use_gpu}.png')
 
-    print("============ key", index_key)
 
-    # make the index described by the key
-    index = faiss.index_factory(d, index_key)
+# Draw time distribution
+import numpy as np
+import matplotlib.pyplot as plt
 
+# data to plot
+n_groups = len(indexing_time_cpu)
+cpu_time = [v for k, v in training_time_cpu.items()]
+gpu_time = [v for k, v in training_time_gpu.items()]
 
-    if use_gpu:
-        # transfer to GPU (may be partial)
-        index = faiss.index_cpu_to_gpu(res, dev_no, index)
-        params = faiss.GpuParameterSpace()
-    else:
-        params = faiss.ParameterSpace()
+# create plot
+fig, ax = plt.subplots()
+index = np.arange(n_groups)
+bar_width = 0.35
+opacity = 0.8
 
-    params.initialize(index)
+rects1 = plt.bar(index, cpu_time, bar_width,
+        alpha=opacity,
+        color='r',
+        label='CPU Time')
 
-    print("[%.3f s] train & add" % (time.time() - t0))
+rects2 = plt.bar(index + bar_width, gpu_time, bar_width,
+        alpha=opacity,
+        color='g',
+        label='GPU Time')
 
-    index.train(xt)
-    index.add(xb)
+plt.xlabel('Method')
+plt.ylabel('Time(s)')
+plt.title('Training Time on 100K 128-d SIFT Features')
+plt.xticks(index + bar_width, [k for k, v in training_time_cpu.items()])
+plt.legend()
 
-    print("[%.3f s] explore op points" % (time.time() - t0))
+# pyplot.gca().set_yscale('log')
+pyplot.legend(loc=2)
+fig.savefig(f'tmp/training_time_gpu{use_gpu}.png')
 
-    # find operating points for this index
-    opi = params.explore(index, xq, crit)
+import matplotlib.pyplot as plt
 
-    print("[%.3f s] result operating points:" % (time.time() - t0))
-    opi.display()
+# data to plot
+n_groups = len(indexing_time_cpu)
+cpu_time = [v for k, v in indexing_time_cpu.items()]
+gpu_time = [v for k, v in indexing_time_gpu.items()]
 
-    # update best operating points so far
-    op.merge_with(opi, index_key + " ")
+# create plot
+fig, ax = plt.subplots()
+index = np.arange(n_groups)
+bar_width = 0.35
+opacity = 0.8
 
-    op_per_key.append((index_key, opi))
+rects1 = plt.bar(index, cpu_time, bar_width,
+        alpha=opacity,
+        color='r',
+        label='CPU Time')
 
-    if graphical_output:
-        # graphical output (to tmp/ subdirectory)
+rects2 = plt.bar(index + bar_width, gpu_time, bar_width,
+        alpha=opacity,
+        color='g',
+        label='GPU Time')
 
-        fig = pyplot.figure(figsize=(12, 9))
-        pyplot.xlabel("1-recall at 1")
-        pyplot.ylabel("search time (ms/query, %d threads)" % faiss.omp_get_max_threads())
-        pyplot.gca().set_yscale('log')
-        pyplot.grid()
-        for i2, opi2 in op_per_key:
-            plot_OperatingPoints(opi2, crit.nq, label = i2, marker = 'o')
-        # plot_OperatingPoints(op, crit.nq, label = 'best', marker = 'o', color = 'r')
-        pyplot.legend(loc=2)
-        fig.savefig('tmp/demo_auto_tune.png')
+plt.xlabel('Method')
+plt.ylabel('Time(s)')
+plt.title('Indexing Time on 1M 128-d SIFT Features')
+plt.xticks(index + bar_width, [k for k, v in training_time_cpu.items()])
+plt.legend()
 
-
+# pyplot.gca().set_yscale('log')
+pyplot.legend(loc=2)
+fig.savefig(f'tmp/indexing_time_gpu{use_gpu}.png')
 print("[%.3f s] final result:" % (time.time() - t0))
 
 op.display()
