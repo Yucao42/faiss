@@ -118,19 +118,19 @@ if use_gpu:
     res = faiss.StandardGpuResources()
     dev_no = 1
 
-# remember results from other index types
-op_per_key = []
-
-
-# keep track of optimal operating points seen so far
-op = faiss.OperatingPoints()
-
 training_time_cpu = {}
 indexing_time_cpu = {}
 training_time_gpu = {}
 indexing_time_gpu = {}
 
+
 for use_gpu in range(2):
+    # remember results from other index types
+    op_per_key = []
+    
+    
+    # keep track of optimal operating points seen so far
+    op = faiss.OperatingPoints()
     for index_key in keys_to_test:
     
         print("============ key", index_key)
@@ -176,19 +176,20 @@ for use_gpu in range(2):
     
         op_per_key.append((index_key, opi))
     
-        # if graphical_output:
-        #     # graphical output (to tmp/ subdirectory)
+    op.display()
+    if graphical_output:
+        # graphical output (to tmp/ subdirectory)
     
-        #     fig = pyplot.figure(figsize=(12, 9))
-        #     pyplot.xlabel("1-recall at 1")
-        #     pyplot.ylabel("search time (ms/query, %d threads)" % faiss.omp_get_max_threads())
-        #     pyplot.gca().set_yscale('log')
-        #     pyplot.grid()
-        #     for i2, opi2 in op_per_key:
-        #         plot_OperatingPoints(opi2, crit.nq, label = i2, marker = 'o')
-        #     # plot_OperatingPoints(op, crit.nq, label = 'best', marker = 'o', color = 'r')
-        #     pyplot.legend(loc=2)
-        #     fig.savefig(f'tmp/demo_auto_tune_gpu{use_gpu}.png')
+        fig = pyplot.figure(figsize=(12, 9))
+        pyplot.xlabel("1-recall at 1")
+        pyplot.ylabel("search time (ms/query, %d threads)" % faiss.omp_get_max_threads())
+        pyplot.gca().set_yscale('log')
+        pyplot.grid()
+        for i2, opi2 in op_per_key:
+            plot_OperatingPoints(opi2, crit.nq, label = i2, marker = 'o')
+        # plot_OperatingPoints(op, crit.nq, label = 'best', marker = 'o', color = 'r')
+        pyplot.legend(loc=2)
+        fig.savefig(f'tmp/optimals_gpu{use_gpu}.png', dpi=400)
 
 
 # Draw time distribution
@@ -224,7 +225,7 @@ plt.legend()
 
 # pyplot.gca().set_yscale('log')
 pyplot.legend(loc=2)
-fig.savefig(f'tmp/training_time_gpu{use_gpu}.png')
+fig.savefig(f'tmp/training_time_gpu{use_gpu}.png', dpi=400)
 
 import matplotlib.pyplot as plt
 
@@ -257,7 +258,7 @@ plt.legend()
 
 # pyplot.gca().set_yscale('log')
 pyplot.legend(loc=2)
-fig.savefig(f'tmp/indexing_time_gpu{use_gpu}.png')
+fig.savefig(f'tmp/indexing_time_gpu{use_gpu}.png', dpi=400)
 print("[%.3f s] final result:" % (time.time() - t0))
 
 op.display()
